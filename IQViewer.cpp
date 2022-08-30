@@ -63,6 +63,29 @@ void IQViewer::DiscardDeviceResources()
     SafeRelease(&m_pBlackBrush);
 }
 
+HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect)
+{
+    HRESULT hr = S_OK;
+    float left_margin = 30.0f;
+    float right_margin = 15.0f;
+    float top_margin = 15.0f;
+    float bottom_margin = 15.0f;
+    float middle_y = (rect.bottom - bottom_margin - rect.top + top_margin) / 2 + rect.top;
+
+    m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin, rect.top + top_margin),
+                              D2D1::Point2F(rect.left + left_margin, rect.bottom - bottom_margin),
+                              m_pBlackBrush,
+                              1.5f);
+
+    m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin, middle_y),
+                              D2D1::Point2F(rect.right - right_margin, middle_y),
+                              m_pBlackBrush,
+                              1.5f);
+
+
+    return hr;
+}
+
 HRESULT IQViewer::Initialize()
 {
     HRESULT hr;
@@ -100,8 +123,8 @@ HRESULT IQViewer::Initialize()
             WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            static_cast<INT>(ceil(640.f * dpiX / 96.f)),
-            static_cast<INT>(ceil(480.f * dpiY / 96.f)),
+            static_cast<INT>(ceil(1024.f * dpiX / 96.f)),
+            static_cast<INT>(ceil(768.f * dpiY / 96.f)),
             NULL,
             NULL,
             HINST_THISCOMPONENT,
@@ -125,11 +148,25 @@ HRESULT IQViewer::OnRender()
     hr = CreateDeviceResources();
     if (SUCCEEDED(hr) && !(m_pRenderTarget->CheckWindowState() & D2D1_WINDOW_STATE_OCCLUDED))
     {
+        RECT rc;
+        GetClientRect(m_hwnd, &rc);
+
+        D2D1_SIZE_F size = D2D1::SizeF(
+            static_cast<FLOAT>(rc.right - rc.left),
+            static_cast<FLOAT>(rc.bottom - rc.top)
+            );
+
         m_pRenderTarget->BeginDraw();
 
         m_pRenderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
 
         m_pRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::White));
+
+        if (size.height / 2 > 60)
+        {
+            DrawGraph(D2D1::RectF(0.0f, 0.0f, size.width, size.height / 2.0f));
+            DrawGraph(D2D1::RectF(0.0f, size.height / 2.0f, size.width, size.height));
+        }
 
         hr = m_pRenderTarget->EndDraw();
 

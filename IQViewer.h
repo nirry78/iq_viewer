@@ -14,6 +14,7 @@ class IQViewer
         HRESULT CreateDeviceIndependentResources();
         HRESULT CreateDeviceResources();
         void DiscardDeviceResources();
+        HRESULT DrawGraph(D2D1_RECT_F rect);
         HRESULT OnRender();
         void OnResize(UINT width, UINT height);
         static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);

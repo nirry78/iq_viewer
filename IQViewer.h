@@ -10,6 +10,8 @@ class IQViewer
         ID2D1Factory *m_pD2DFactory;
         ID2D1HwndRenderTarget *m_pRenderTarget;
         ID2D1SolidColorBrush *m_pBlackBrush;
+        ID2D1SolidColorBrush *m_pGrayBrush;
+        ID2D1StrokeStyle *m_pStrokeStyleDotRound;
 
         HRESULT CreateDeviceIndependentResources();
         HRESULT CreateDeviceResources();

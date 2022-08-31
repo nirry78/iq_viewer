@@ -4,7 +4,9 @@ IQViewer::IQViewer():
     m_hwnd(NULL),
     m_pD2DFactory(NULL),
     m_pRenderTarget(NULL),
-    m_pBlackBrush(NULL)
+    m_pBlackBrush(NULL),
+    m_pGrayBrush(NULL),
+    m_pStrokeStyleDotRound(NULL)
 {
 
 }
@@ -12,8 +14,7 @@ IQViewer::IQViewer():
 IQViewer::~IQViewer()
 {
     SafeRelease(&m_pD2DFactory);
-    SafeRelease(&m_pRenderTarget);
-    SafeRelease(&m_pBlackBrush);
+    DiscardDeviceResources();
 }
 
 HRESULT IQViewer::CreateDeviceIndependentResources()
@@ -52,6 +53,37 @@ HRESULT IQViewer::CreateDeviceResources()
                 &m_pBlackBrush
                 );
         }
+
+        if (SUCCEEDED(hr))
+        {
+            // Create a black brush.
+            hr = m_pRenderTarget->CreateSolidColorBrush(
+                D2D1::ColorF(D2D1::ColorF::Gray),
+                &m_pGrayBrush
+                );
+        }
+
+
+        // Dash array for dashStyle D2D1_DASH_STYLE_CUSTOM
+        float dashes[] = {1.0f, 2.0f, 2.0f, 3.0f, 2.0f, 2.0f};
+
+        // Stroke Style with Dash Style -- Custom
+        if (SUCCEEDED(hr))
+        {
+            hr = m_pD2DFactory->CreateStrokeStyle(
+                D2D1::StrokeStyleProperties(
+                    D2D1_CAP_STYLE_FLAT,
+                    D2D1_CAP_STYLE_FLAT,
+                    D2D1_CAP_STYLE_ROUND,
+                    D2D1_LINE_JOIN_MITER,
+                    10.0f,
+                    D2D1_DASH_STYLE_DOT,
+                    0.0f),
+                0,
+                0,
+                &m_pStrokeStyleDotRound
+                );
+        }
     }
 
     return hr;
@@ -61,6 +93,8 @@ void IQViewer::DiscardDeviceResources()
 {
     SafeRelease(&m_pRenderTarget);
     SafeRelease(&m_pBlackBrush);
+    SafeRelease(&m_pGrayBrush);
+    SafeRelease(&m_pStrokeStyleDotRound);
 }
 
 HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect)
@@ -70,18 +104,44 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect)
     float right_margin = 15.0f;
     float top_margin = 15.0f;
     float bottom_margin = 15.0f;
-    float middle_y = (rect.bottom - bottom_margin - rect.top + top_margin) / 2 + rect.top;
+    float strokeWidth = 1.2f;
+    float cell_height = ((rect.bottom - bottom_margin) - (rect.top + top_margin)) / 6;
+    float cell_width = ((rect.right - right_margin) - (rect.left + left_margin)) / 10;
+    float middle_y = cell_height * 3 + rect.top;
 
     m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin, rect.top + top_margin),
                               D2D1::Point2F(rect.left + left_margin, rect.bottom - bottom_margin),
                               m_pBlackBrush,
-                              1.5f);
+                              strokeWidth);
 
-    m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin, middle_y),
-                              D2D1::Point2F(rect.right - right_margin, middle_y),
-                              m_pBlackBrush,
-                              1.5f);
 
+    for (size_t index = 0; index < 7; index++)
+    {
+        if (index == 3)
+        {
+            m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin, rect.top + top_margin + cell_height * index),
+                                      D2D1::Point2F(rect.right - right_margin, rect.top + top_margin + cell_height * index),
+                                      m_pBlackBrush,
+                                      strokeWidth);
+        }
+        else
+        {
+            m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin, rect.top + top_margin + cell_height * index),
+                                      D2D1::Point2F(rect.right - right_margin, rect.top + top_margin + cell_height * index),
+                                      m_pGrayBrush,
+                                      strokeWidth,
+                                      m_pStrokeStyleDotRound);
+        }
+    }
+
+    for (size_t index = 1; index < 11; index++)
+    {
+        m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin + index * cell_width, rect.top + top_margin),
+                                  D2D1::Point2F(rect.left + left_margin + index * cell_width, rect.bottom - bottom_margin),
+                                  m_pGrayBrush,
+                                  strokeWidth,
+                                  m_pStrokeStyleDotRound);
+    }
 
     return hr;
 }

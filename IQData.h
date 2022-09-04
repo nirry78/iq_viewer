@@ -8,6 +8,16 @@ typedef struct
     double i, q;
 } ComplexNumber;
 
+typedef enum {
+    ValueTypeNone,
+    ValueTypeI,
+    ValueTypeQ,
+    ValueTypePower,
+    ValueTypeDemod,
+    ValueTypePhase,
+    ValueTypeUnwrappedPhase,
+} ValueType;
+
 class IQData
 {
     private:
@@ -22,7 +32,7 @@ class IQData
         bool AddValue(double i, double q);
         void Dump(FILE *dst);
         size_t GetCount() { return m_DataCount; };
-        bool GetValue(size_t index, double *i, double *q);
+        bool GetValue(size_t index, ValueType type, double *value);
         bool ReadFile(FILE *file);
 
 };

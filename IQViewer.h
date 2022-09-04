@@ -16,13 +16,17 @@ class IQViewer
         ID2D1SolidColorBrush *m_pRedBrush;
         ID2D1StrokeStyle *m_pStrokeStyleDotRound;
         IQData *m_IQData;
+        SOCKET m_ServerSocket;
+        HANDLE m_ServerHandle;
 
         HRESULT CreateDeviceIndependentResources();
         HRESULT CreateDeviceResources();
         void DiscardDeviceResources();
-        HRESULT DrawGraph(D2D1_RECT_F rect, IQData *iqData);
+        HRESULT DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType valueTypes[]);
         HRESULT OnRender();
         void OnResize(UINT width, UINT height);
+        bool OnServerEvent();
+        HRESULT StartServer();
         static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
     public:

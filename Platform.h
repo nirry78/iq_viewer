@@ -2,7 +2,7 @@
 #define _PLATFORM_H
 
 // Windows Header Files:
-#include <windows.h>
+#include <WinSock2.h>
 
 // C RunTime Header Files:
 #include <stdlib.h>

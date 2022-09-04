@@ -53,15 +53,35 @@ void IQData::Dump(FILE *dst)
     }
 }
 
-bool IQData::GetValue(size_t index, double *i, double *q)
+bool IQData::GetValue(size_t index, ValueType type, double *value)
 {
-    bool result = false;
+    bool result = index < m_DataCount;
 
-    if (index < m_DataCount)
+    if (result)
     {
-        *i = m_Data[index].i;
-        *q = m_Data[index].q;
-        result = true;
+        switch (type)
+        {
+            case ValueTypeI:
+            {
+                *value = m_Data[index].i;
+                break;
+            }
+            case ValueTypeQ:
+            {
+                *value = m_Data[index].q;
+                break;
+            }
+            case ValueTypePower:
+            {
+                *value = sqrt((m_Data[index].i * m_Data[index].i) + (m_Data[index].q * m_Data[index].q));
+                break;
+            }
+            default:
+            {
+                *value = 0.0;
+                break;
+            }
+        }
     }
 
     return result;

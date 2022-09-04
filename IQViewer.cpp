@@ -9,7 +9,9 @@ IQViewer::IQViewer():
     m_pYellowBrush(NULL),
     m_pRedBrush(NULL),
     m_pStrokeStyleDotRound(NULL),
-    m_IQData(NULL)
+    m_IQData(NULL),
+    m_ServerSocket(INVALID_SOCKET),
+    m_ServerHandle(NULL)
 {
 
 }
@@ -22,6 +24,17 @@ IQViewer::~IQViewer()
     if (m_IQData)
     {
         delete m_IQData;
+    }
+
+    if (m_ServerSocket != INVALID_SOCKET)
+    {
+        shutdown(m_ServerSocket, SD_BOTH);
+        closesocket(m_ServerSocket);
+    }
+
+    if (m_ServerHandle != NULL)
+    {
+        CloseHandle(m_ServerHandle);
     }
 }
 
@@ -124,7 +137,7 @@ void IQViewer::DiscardDeviceResources()
     SafeRelease(&m_pStrokeStyleDotRound);
 }
 
-HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData)
+HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType valueTypes[])
 {
     HRESULT hr = S_OK;
     float left_margin = 30.0f;
@@ -172,32 +185,86 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData)
                                   m_pStrokeStyleDotRound);
     }
 
-    double i, i_prev, q, q_prev;
+    double i, i_prev, q, q_prev, power, power_prev;
     float scale_x, scale_y;
 
     if (iqData)
     {
+        bool valueTypeI = false, valueTypeQ = false, valueTypePower = false;
         scale_y = view_height / 500;
         scale_x = view_width / iqData->GetCount();
 
+        for (size_t index = 0; valueTypes[index] != ValueTypeNone ; index++)
+        {
+            switch (valueTypes[index])
+            {
+                case ValueTypeI:
+                {
+                    valueTypeI = true;
+                    break;
+                }
+                case ValueTypeQ:
+                {
+                    valueTypeQ = true;
+                    break;
+                }
+                case ValueTypePower:
+                {
+                    valueTypePower = true;
+                    break;
+                }
+                case ValueTypeDemod:
+                {
+                    break;
+                }
+                case ValueTypePhase:
+                {
+                    break;
+                }
+                case ValueTypeUnwrappedPhase:
+                {
+                    break;
+                }
+            }
+        }
+
         for (size_t index = 0; index < iqData->GetCount(); index++)
         {
-            if (iqData->GetValue(index, &i, &q))
+            if (valueTypeI && iqData->GetValue(index, ValueTypeI, &i))
             {
                 if (index > 0)
                 {
-                    m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin + (float)index * scale_x, middle_y + (float)(i_prev * scale_y)),
-                                              D2D1::Point2F(rect.left + left_margin + (float)(index + 1) * scale_x, middle_y + (float)(i * scale_y)),
+                    m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin + (float)index * scale_x, middle_y - (float)(i_prev * scale_y)),
+                                              D2D1::Point2F(rect.left + left_margin + (float)(index + 1) * scale_x, middle_y - (float)(i * scale_y)),
                                               m_pYellowBrush,
-                                              strokeWidth);
-                    m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin + (float)index * scale_x, middle_y + (float)(q_prev * scale_y)),
-                                              D2D1::Point2F(rect.left + left_margin + (float)(index + 1) * scale_x, middle_y + (float)(q * scale_y)),
-                                              m_pRedBrush,
                                               strokeWidth);
                 }
 
                 i_prev = i;
+            }
+
+            if (valueTypeQ && iqData->GetValue(index, ValueTypeQ, &q))
+            {
+                if (index > 0)
+                {
+                    m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin + (float)index * scale_x, middle_y - (float)(q_prev * scale_y)),
+                                              D2D1::Point2F(rect.left + left_margin + (float)(index + 1) * scale_x, middle_y - (float)(q * scale_y)),
+                                              m_pRedBrush,
+                                              strokeWidth);
+                }
                 q_prev = q;
+            }
+
+            if (valueTypePower && iqData->GetValue(index, ValueTypePower, &power))
+            {
+                if (index > 0)
+                {
+                    m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin + (float)index * scale_x, middle_y - (float)(power_prev * scale_y)),
+                                              D2D1::Point2F(rect.left + left_margin + (float)(index + 1) * scale_x, middle_y - (float)(power * scale_y)),
+                                              m_pRedBrush,
+                                              strokeWidth);
+                }
+                power_prev = power;
             }
         }
     }
@@ -219,9 +286,14 @@ HRESULT IQViewer::Initialize()
         }
     }
 
-    // Initialize device-indpendent resources, such
-    // as the Direct2D factory.
-    hr = CreateDeviceIndependentResources();
+    hr = StartServer();
+    if (SUCCEEDED(hr))
+    {
+        // Initialize device-indpendent resources, such
+        // as the Direct2D factory.
+        hr = CreateDeviceIndependentResources();
+    }
+
     if (SUCCEEDED(hr))
     {
         // Register the window class.
@@ -295,8 +367,10 @@ HRESULT IQViewer::OnRender()
 
         if (size.height / 2 > 60)
         {
-            DrawGraph(D2D1::RectF(0.0f, 0.0f, size.width, size.height / 2.0f), m_IQData);
-            DrawGraph(D2D1::RectF(0.0f, size.height / 2.0f, size.width, size.height), m_IQData);
+            const ValueType valueTypesIQ[3] = {ValueTypeI, ValueTypeQ, ValueTypeNone};
+            const ValueType valueTypesPower[2] = {ValueTypePower, ValueTypeNone};
+            DrawGraph(D2D1::RectF(0.0f, 0.0f, size.width, size.height / 2.0f), m_IQData, valueTypesIQ);
+            DrawGraph(D2D1::RectF(0.0f, size.height / 2.0f, size.width, size.height), m_IQData, valueTypesPower);
         }
 
         hr = m_pRenderTarget->EndDraw();
@@ -323,15 +397,118 @@ void IQViewer::OnResize(UINT width, UINT height)
     }
 }
 
+bool IQViewer::OnServerEvent()
+{
+    WSANETWORKEVENTS events;
+    bool result = true;
+
+    if (SOCKET_ERROR != WSAEnumNetworkEvents(m_ServerSocket, m_ServerHandle, &events))
+    {
+        if (events.lNetworkEvents & FD_ACCEPT)
+        {
+            sockaddr_in clientAddress;
+            int clientAddressLen = sizeof(clientAddress);
+            SOCKET clientSocket;
+
+            clientSocket = accept(m_ServerSocket, (sockaddr*)&clientAddress, &clientAddressLen);
+            if (clientSocket != INVALID_SOCKET)
+            {
+                shutdown(clientSocket, SD_BOTH);
+                closesocket(clientSocket);
+            }
+        }
+    }
+    else
+    {
+        result = false;
+    }
+
+    return result;
+}
+
 void IQViewer::RunMessageLoop()
 {
     MSG msg;
+    HANDLE handleList[2];
+    DWORD result;
+    DWORD count = 1;
 
-    while (GetMessage(&msg, NULL, 0, 0))
+    handleList[0] = m_ServerHandle;
+
+    for (;;)
     {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+        result = MsgWaitForMultipleObjects(1, handleList, false, INFINITE, QS_ALLEVENTS);
+        if (result == WAIT_OBJECT_0)
+        {
+            if (!OnServerEvent())
+            {
+                break;
+            }
+        }
+        else if (result == WAIT_OBJECT_0 + count)
+        {
+            if (GetMessage(&msg, NULL, 0, 0))
+            {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
+            else
+            {
+                break;
+            }
+        }
     }
+}
+
+HRESULT IQViewer::StartServer()
+{
+    HRESULT hr = S_OK;
+
+    m_ServerSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (m_ServerSocket == INVALID_SOCKET)
+    {
+        hr = HRESULT_FROM_WIN32(WSAGetLastError());
+    }
+
+    if (SUCCEEDED(hr))
+    {
+        sockaddr_in sa;
+        sa.sin_family = AF_INET;
+        sa.sin_port = htons(7612);
+        sa.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+
+        if (bind(m_ServerSocket, (const sockaddr *)&sa, sizeof(sa)) == SOCKET_ERROR)
+        {
+            hr = HRESULT_FROM_WIN32(WSAGetLastError());
+        }
+    }
+
+    if (SUCCEEDED(hr))
+    {
+        if (listen(m_ServerSocket, 10) == SOCKET_ERROR)
+        {
+            hr = HRESULT_FROM_WIN32(WSAGetLastError());
+        }
+    }
+
+    if (SUCCEEDED(hr))
+    {
+        m_ServerHandle = WSACreateEvent();
+        if (m_ServerHandle == NULL)
+        {
+            hr = HRESULT_FROM_WIN32(WSAGetLastError());
+        }
+    }
+
+    if (SUCCEEDED(hr))
+    {
+        if (WSAEventSelect(m_ServerSocket, m_ServerHandle, FD_ACCEPT) == SOCKET_ERROR)
+        {
+            hr = HRESULT_FROM_WIN32(WSAGetLastError());
+        }
+    }
+
+    return hr;
 }
 
 LRESULT IQViewer::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -411,6 +588,9 @@ int WINAPI WinMain(HINSTANCE hInstance ,
                    LPSTR lpCmdLine,
                    int nCmdShow)
 {
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2, 2), &wsaData);
+
     HeapSetInformation(NULL, HeapEnableTerminationOnCorruption, NULL, 0);
 
     if (SUCCEEDED(CoInitialize(NULL)))
@@ -425,6 +605,8 @@ int WINAPI WinMain(HINSTANCE hInstance ,
         }
         CoUninitialize();
     }
+
+    WSACleanup();
 
     return 0;
 }

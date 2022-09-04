@@ -6,7 +6,10 @@ IQViewer::IQViewer():
     m_pRenderTarget(NULL),
     m_pBlackBrush(NULL),
     m_pGrayBrush(NULL),
-    m_pStrokeStyleDotRound(NULL)
+    m_pYellowBrush(NULL),
+    m_pRedBrush(NULL),
+    m_pStrokeStyleDotRound(NULL),
+    m_IQData(NULL)
 {
 
 }
@@ -15,6 +18,11 @@ IQViewer::~IQViewer()
 {
     SafeRelease(&m_pD2DFactory);
     DiscardDeviceResources();
+
+    if (m_IQData)
+    {
+        delete m_IQData;
+    }
 }
 
 HRESULT IQViewer::CreateDeviceIndependentResources()
@@ -63,6 +71,23 @@ HRESULT IQViewer::CreateDeviceResources()
                 );
         }
 
+        if (SUCCEEDED(hr))
+        {
+            // Create a yellow brush.
+            hr = m_pRenderTarget->CreateSolidColorBrush(
+                D2D1::ColorF(D2D1::ColorF::Yellow),
+                &m_pYellowBrush
+                );
+        }
+
+        if (SUCCEEDED(hr))
+        {
+            // Create a yellow brush.
+            hr = m_pRenderTarget->CreateSolidColorBrush(
+                D2D1::ColorF(D2D1::ColorF::Red),
+                &m_pRedBrush
+                );
+        }
 
         // Dash array for dashStyle D2D1_DASH_STYLE_CUSTOM
         float dashes[] = {1.0f, 2.0f, 2.0f, 3.0f, 2.0f, 2.0f};
@@ -94,10 +119,12 @@ void IQViewer::DiscardDeviceResources()
     SafeRelease(&m_pRenderTarget);
     SafeRelease(&m_pBlackBrush);
     SafeRelease(&m_pGrayBrush);
+    SafeRelease(&m_pYellowBrush);
+    SafeRelease(&m_pRedBrush);
     SafeRelease(&m_pStrokeStyleDotRound);
 }
 
-HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect)
+HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData)
 {
     HRESULT hr = S_OK;
     float left_margin = 30.0f;
@@ -105,9 +132,11 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect)
     float top_margin = 15.0f;
     float bottom_margin = 15.0f;
     float strokeWidth = 1.2f;
-    float cell_height = ((rect.bottom - bottom_margin) - (rect.top + top_margin)) / 6;
-    float cell_width = ((rect.right - right_margin) - (rect.left + left_margin)) / 10;
-    float middle_y = cell_height * 3 + rect.top;
+    float view_height = ((rect.bottom - bottom_margin) - (rect.top + top_margin));
+    float view_width = ((rect.right - right_margin) - (rect.left + left_margin));
+    float cell_height = view_height / 6;
+    float cell_width = view_width / 10;
+    float middle_y = cell_height * 3 + rect.top + top_margin;
 
     m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin, rect.top + top_margin),
                               D2D1::Point2F(rect.left + left_margin, rect.bottom - bottom_margin),
@@ -143,12 +172,52 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect)
                                   m_pStrokeStyleDotRound);
     }
 
+    double i, i_prev, q, q_prev;
+    float scale_x, scale_y;
+
+    if (iqData)
+    {
+        scale_y = view_height / 500;
+        scale_x = view_width / iqData->GetCount();
+
+        for (size_t index = 0; index < iqData->GetCount(); index++)
+        {
+            if (iqData->GetValue(index, &i, &q))
+            {
+                if (index > 0)
+                {
+                    m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin + (float)index * scale_x, middle_y + (float)(i_prev * scale_y)),
+                                              D2D1::Point2F(rect.left + left_margin + (float)(index + 1) * scale_x, middle_y + (float)(i * scale_y)),
+                                              m_pYellowBrush,
+                                              strokeWidth);
+                    m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin + (float)index * scale_x, middle_y + (float)(q_prev * scale_y)),
+                                              D2D1::Point2F(rect.left + left_margin + (float)(index + 1) * scale_x, middle_y + (float)(q * scale_y)),
+                                              m_pRedBrush,
+                                              strokeWidth);
+                }
+
+                i_prev = i;
+                q_prev = q;
+            }
+        }
+    }
     return hr;
 }
 
 HRESULT IQViewer::Initialize()
 {
     HRESULT hr;
+
+    m_IQData = new IQData(512);
+    if (m_IQData)
+    {
+        for (size_t index = 0; index < 512; index++)
+        {
+            double i = 240.0 * sin((double)index / 90.0 * M_PI);
+            double q = 240.0 * cos((double)index / 90.0 * M_PI);
+            m_IQData->AddValue(i, q);
+        }
+    }
 
     // Initialize device-indpendent resources, such
     // as the Direct2D factory.
@@ -170,21 +239,14 @@ HRESULT IQViewer::Initialize()
         RegisterClassEx(&wcex);
 
         // Create the application window.
-        //
-        // Because the CreateWindow function takes its size in pixels, we
-        // obtain the system DPI and use it to scale the window size.
-        FLOAT dpiX, dpiY;
-        m_pD2DFactory->GetDesktopDpi(&dpiX, &dpiY);
-
-        // Create the application window.
         m_hwnd = CreateWindow(
             L"IQViewer",
             L"IQ Viewer",
             WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            static_cast<INT>(ceil(1024.f * dpiX / 96.f)),
-            static_cast<INT>(ceil(768.f * dpiY / 96.f)),
+            0,
+            0,
             NULL,
             NULL,
             HINST_THISCOMPONENT,
@@ -193,6 +255,15 @@ HRESULT IQViewer::Initialize()
         hr = m_hwnd ? S_OK : E_FAIL;
         if (SUCCEEDED(hr))
         {
+            float dpi = (float)GetDpiForWindow(m_hwnd);
+
+            // Because the CreateWindow function takes its size in pixels, we
+            // obtain the system DPI and use it to scale the window size.
+            SetWindowPos(m_hwnd, NULL, 0, 0,
+                         static_cast<INT>(ceil(1024.f * dpi / 96.f)),
+                         static_cast<INT>(ceil(768.f * dpi / 96.f)),
+                         0);
+
             ShowWindow(m_hwnd, SW_SHOWNORMAL);
             UpdateWindow(m_hwnd);
         }
@@ -224,8 +295,8 @@ HRESULT IQViewer::OnRender()
 
         if (size.height / 2 > 60)
         {
-            DrawGraph(D2D1::RectF(0.0f, 0.0f, size.width, size.height / 2.0f));
-            DrawGraph(D2D1::RectF(0.0f, size.height / 2.0f, size.width, size.height));
+            DrawGraph(D2D1::RectF(0.0f, 0.0f, size.width, size.height / 2.0f), m_IQData);
+            DrawGraph(D2D1::RectF(0.0f, size.height / 2.0f, size.width, size.height), m_IQData);
         }
 
         hr = m_pRenderTarget->EndDraw();

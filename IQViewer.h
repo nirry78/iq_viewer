@@ -2,6 +2,7 @@
 #define _IQ_VIEWER_H
 
 #include "Platform.h"
+#include "IQData.h"
 
 class IQViewer
 {
@@ -11,12 +12,15 @@ class IQViewer
         ID2D1HwndRenderTarget *m_pRenderTarget;
         ID2D1SolidColorBrush *m_pBlackBrush;
         ID2D1SolidColorBrush *m_pGrayBrush;
+        ID2D1SolidColorBrush *m_pYellowBrush;
+        ID2D1SolidColorBrush *m_pRedBrush;
         ID2D1StrokeStyle *m_pStrokeStyleDotRound;
+        IQData *m_IQData;
 
         HRESULT CreateDeviceIndependentResources();
         HRESULT CreateDeviceResources();
         void DiscardDeviceResources();
-        HRESULT DrawGraph(D2D1_RECT_F rect);
+        HRESULT DrawGraph(D2D1_RECT_F rect, IQData *iqData);
         HRESULT OnRender();
         void OnResize(UINT width, UINT height);
         static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);

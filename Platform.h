@@ -16,6 +16,10 @@
 #include <dwrite.h>
 #include <wincodec.h>
 
+#include <math.h>
+#include <stdint.h>
+#include <stdio.h>
+
 template<class Interface>
 inline void SafeRelease(
     Interface **ppInterfaceToRelease)

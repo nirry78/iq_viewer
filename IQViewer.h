@@ -4,10 +4,15 @@
 #include "Platform.h"
 #include "IQData.h"
 
+typedef enum {
+    ID_PASTE,
+} IQViewerCommand;
+
 class IQViewer
 {
     private:
         HWND m_hwnd;
+        HACCEL m_accel;
         ID2D1Factory *m_pD2DFactory;
         ID2D1HwndRenderTarget *m_pRenderTarget;
         ID2D1SolidColorBrush *m_pBlackBrush;
@@ -23,6 +28,7 @@ class IQViewer
         HRESULT CreateDeviceResources();
         void DiscardDeviceResources();
         HRESULT DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType valueTypes[]);
+        void OnAccelerator(IQViewerCommand command);
         HRESULT OnRender();
         void OnResize(UINT width, UINT height);
         bool OnServerEvent();

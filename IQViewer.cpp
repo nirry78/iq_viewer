@@ -339,9 +339,48 @@ HRESULT IQViewer::Initialize()
             ShowWindow(m_hwnd, SW_SHOWNORMAL);
             UpdateWindow(m_hwnd);
         }
+
+        if (SUCCEEDED(hr))
+        {
+            ACCEL accel[1];
+
+            accel[0].fVirt = FCONTROL | FVIRTKEY;
+            accel[0].key = 0x56;
+            accel[0].cmd = ID_PASTE;
+
+            m_accel = CreateAcceleratorTable(accel, sizeof(accel) / sizeof(accel[0]));
+        }
     }
 
     return hr;
+}
+
+void IQViewer::OnAccelerator(IQViewerCommand command)
+{
+    switch (command)
+    {
+        case ID_PASTE:
+        {
+            if (IsClipboardFormatAvailable(CF_TEXT) && OpenClipboard(m_hwnd))
+            {
+                HGLOBAL hglb = GetClipboardData(CF_TEXT);
+                if (hglb)
+                {
+                    LPTSTR lptstr = (LPTSTR)GlobalLock(hglb);
+                    if (lptstr)
+                    {
+                        size_t size = wcslen(lptstr);
+                        wchar_t buffer[100];
+                        swprintf(buffer, L"Paste (len: %zu)\n", size);
+                        OutputDebugString(buffer);
+                        GlobalUnlock(hglb);
+                    }
+                }
+                CloseClipboard();
+            }
+            break;
+        }
+    }
 }
 
 HRESULT IQViewer::OnRender()
@@ -447,10 +486,13 @@ void IQViewer::RunMessageLoop()
         }
         else if (result == WAIT_OBJECT_0 + count)
         {
-            if (GetMessage(&msg, NULL, 0, 0))
+            if (GetMessage(&msg, NULL, 0, 0) > 0)
             {
-                TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                if (!TranslateAccelerator(m_hwnd, m_accel, &msg))
+                {
+                    TranslateMessage(&msg);
+                    DispatchMessage(&msg);
+                }
             }
             else
             {
@@ -458,6 +500,7 @@ void IQViewer::RunMessageLoop()
             }
         }
     }
+    OutputDebugString(TEXT("RunMessageLoop - Exit\n"));
 }
 
 HRESULT IQViewer::StartServer()
@@ -571,6 +614,15 @@ LRESULT IQViewer::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 result = 1;
                 wasHandled = true;
                 break;
+            case WM_COMMAND:
+            {
+                if (HIWORD(wParam) == 1)
+                {
+                    pIQViewer->OnAccelerator((IQViewerCommand)LOWORD(wParam));
+                }
+                wasHandled = true;
+                break;
+            }
             }
         }
 

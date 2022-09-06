@@ -19,6 +19,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 template<class Interface>
 inline void SafeRelease(
@@ -45,3 +46,4 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #endif
 
 #endif
+

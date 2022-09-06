@@ -3,6 +3,7 @@
 
 #include "Platform.h"
 #include "IQData.h"
+#include "IQDebug.h"
 
 typedef enum {
     ID_PASTE,
@@ -15,10 +16,11 @@ class IQViewer
         HACCEL m_accel;
         ID2D1Factory *m_pD2DFactory;
         ID2D1HwndRenderTarget *m_pRenderTarget;
-        ID2D1SolidColorBrush *m_pBlackBrush;
-        ID2D1SolidColorBrush *m_pGrayBrush;
+        ID2D1SolidColorBrush *m_pGraphColor1Brush;
+        ID2D1SolidColorBrush *m_pGraphColor2Brush;
         ID2D1SolidColorBrush *m_pYellowBrush;
         ID2D1SolidColorBrush *m_pRedBrush;
+        ID2D1SolidColorBrush *m_pGraphBrush;
         ID2D1StrokeStyle *m_pStrokeStyleDotRound;
         IQData *m_IQData;
         SOCKET m_ServerSocket;

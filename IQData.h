@@ -2,6 +2,7 @@
 #define _IQ_DATA_H
 
 #include "Platform.h"
+#include "IQDebug.h"
 
 typedef struct
 {

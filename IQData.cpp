@@ -1,5 +1,47 @@
 #include "IQData.h"
 
+typedef enum
+{
+    TOKEN_NEWLINE,
+    TOKEN_VALUE,
+    TOKEN_COMMA,
+    TOKEN_DOT,
+    TOKEN_WHITESPACE,
+    TOKEN_OTHER,
+} Token;
+
+const char *tokenToText[] =
+{
+    "NEWLINE",
+    "VALUE",
+    "COMMA",
+    "DOT",
+    "WHITESPACE",
+    "OTHER",
+};
+
+typedef enum
+{
+    DECODE_STATE_IDLE,
+    DECODE_STATE_I,
+    DECODE_STATE_I_WHITESPACE,
+    DECODE_STATE_Q_PENDING,
+    DECODE_STATE_Q,
+    DECODE_STATE_IGNORE,
+    DECODE_STATE_ERROR
+} DecodeState;
+
+const char *stateToText[] =
+{
+    "IDLE",
+    "I",
+    "I_WHITESPACE",
+    "Q_PENDING",
+    "Q",
+    "IGNORE",
+    "ERROR"
+};
+
 IQData::IQData(size_t expectedCount):
     m_DataSize(expectedCount),
     m_DataCount(0),
@@ -20,6 +62,8 @@ IQData::~IQData()
 bool IQData::AddValue(double i, double q)
 {
     bool result = false;
+
+    LOGD("AddValue (I: %g, Q: %g)", i, q);
 
     if (m_DataCount >= m_DataSize)
     {
@@ -89,18 +133,210 @@ bool IQData::GetValue(size_t index, ValueType type, double *value)
 
 bool IQData::ProcessData(char *data, size_t dataLength)
 {
-    FILE *f = fopen("iq_data.csv", "wt");
+    DecodeState state = DECODE_STATE_IDLE;
+    uint64_t value_u64 = 0, value_i = 0, value_q = 0;
+    double value_double = 0.0;
 
-    if (f)
+    for (size_t index = 0; index < dataLength && state != DECODE_STATE_ERROR; index++)
     {
-        for (size_t index = 0; index < dataLength; index++)
-        {
+        const char c = data[index];
+        size_t value;
+        Token token;
 
+        switch (c)
+        {
+            case '\n':
+            case '\r':
+            {
+                token = TOKEN_NEWLINE;
+                break;
+            }
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+            {
+                value = (size_t)(c - '0');
+                token = TOKEN_VALUE;
+                break;
+            }
+            case 'a':
+            case 'b':
+            case 'c':
+            case 'd':
+            case 'e':
+            case 'f':
+            {
+                value = (size_t)(c - ('a' + 10));
+                token = TOKEN_VALUE;
+                break;
+            }
+            case 'A':
+            case 'B':
+            case 'C':
+            case 'D':
+            case 'E':
+            case 'F':
+            {
+                value = (size_t)(c - ('A' + 10));
+                token = TOKEN_VALUE;
+                break;
+            }
+            case ',':
+            {
+                token = TOKEN_COMMA;
+                break;
+            }
+            case '.':
+            {
+                token = TOKEN_DOT;
+                break;
+            }
+            case '\t':
+            case ' ':
+            {
+                token = TOKEN_WHITESPACE;
+                break;
+            }
+            default:
+            {
+                token = TOKEN_OTHER;
+                break;
+            }
         }
-        fclose(f);
+
+        LOGD("Decode (state: %s, token: %s, input: %u)", stateToText[state], tokenToText[token], c);
+
+        switch (state)
+        {
+            case DECODE_STATE_IDLE:
+            {
+                if (token == TOKEN_VALUE)
+                {
+                    value_u64 = value;
+                    state = DECODE_STATE_I;
+                }
+                break;
+            }
+            case DECODE_STATE_I:
+            {
+                if (token == TOKEN_VALUE)
+                {
+                    value_u64 = value + (value_u64 * 10);
+                }
+                else
+                {
+                    value_i = value_u64;
+                    value_u64 = 0;
+
+                    if (token == TOKEN_WHITESPACE)
+                    {
+                        state = DECODE_STATE_I_WHITESPACE;
+                    }
+                    else if (token == TOKEN_NEWLINE)
+                    {
+                        state = DECODE_STATE_IDLE;
+                    }
+                    else if (token == TOKEN_COMMA)
+                    {
+                        state = DECODE_STATE_Q_PENDING;
+                    }
+                    else
+                    {
+                        state = DECODE_STATE_ERROR;
+                    }
+                }
+                break;
+            }
+            case DECODE_STATE_I_WHITESPACE:
+            {
+                if (token == TOKEN_WHITESPACE)
+                {
+                    state = DECODE_STATE_I_WHITESPACE;
+                }
+                else if (token == TOKEN_NEWLINE)
+                {
+                    state = DECODE_STATE_IDLE;
+                }
+                else if (token == TOKEN_COMMA)
+                {
+                    state = DECODE_STATE_Q_PENDING;
+                }
+                else
+                {
+                    state = DECODE_STATE_ERROR;
+                }
+                break;
+            }
+            case DECODE_STATE_Q_PENDING:
+            {
+                if (token == TOKEN_VALUE)
+                {
+                    value_u64 = value;
+                    state = DECODE_STATE_Q;
+                }
+                else if (token == TOKEN_WHITESPACE)
+                {
+                    state = DECODE_STATE_Q_PENDING;
+                }
+                else if (token == TOKEN_NEWLINE)
+                {
+                    state = DECODE_STATE_IDLE;
+                }
+                else
+                {
+                    state = DECODE_STATE_ERROR;
+                }
+                break;
+            }
+            case DECODE_STATE_Q:
+            {
+                 if (token == TOKEN_VALUE)
+                {
+                    value_u64 = value + (value_u64 * 10);
+                }
+                else
+                {
+                    value_q = value_u64;
+                    value_u64 = 0;
+
+                    if (!AddValue((double)value_i, (double)value_q))
+                    {
+                        state = DECODE_STATE_ERROR;
+                    }
+                    else  if (token == TOKEN_WHITESPACE || token == TOKEN_COMMA)
+                    {
+                        state = DECODE_STATE_IGNORE;
+                    }
+                    else if (token == TOKEN_NEWLINE)
+                    {
+                        state = DECODE_STATE_IDLE;
+                    }
+                    else
+                    {
+                        state = DECODE_STATE_ERROR;
+                    }
+                }
+                break;
+            }
+            case DECODE_STATE_IGNORE:
+            {
+                if (token == TOKEN_NEWLINE)
+                {
+                    state = DECODE_STATE_IDLE;
+                }
+                break;
+            }
+        }
     }
 
-    return false;
+    return state != DECODE_STATE_ERROR;
 }
 
 bool IQData::ReadFile(FILE *file)

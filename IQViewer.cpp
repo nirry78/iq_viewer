@@ -4,10 +4,11 @@ IQViewer::IQViewer():
     m_hwnd(NULL),
     m_pD2DFactory(NULL),
     m_pRenderTarget(NULL),
-    m_pBlackBrush(NULL),
-    m_pGrayBrush(NULL),
+    m_pGraphColor1Brush(NULL),
+    m_pGraphColor2Brush(NULL),
     m_pYellowBrush(NULL),
     m_pRedBrush(NULL),
+    m_pGraphBrush(NULL),
     m_pStrokeStyleDotRound(NULL),
     m_IQData(NULL),
     m_ServerSocket(INVALID_SOCKET),
@@ -70,8 +71,8 @@ HRESULT IQViewer::CreateDeviceResources()
         {
             // Create a black brush.
             hr = m_pRenderTarget->CreateSolidColorBrush(
-                D2D1::ColorF(D2D1::ColorF::Black),
-                &m_pBlackBrush
+                D2D1::ColorF(0xc08c8c),
+                &m_pGraphColor1Brush
                 );
         }
 
@@ -79,8 +80,8 @@ HRESULT IQViewer::CreateDeviceResources()
         {
             // Create a black brush.
             hr = m_pRenderTarget->CreateSolidColorBrush(
-                D2D1::ColorF(D2D1::ColorF::Gray),
-                &m_pGrayBrush
+                D2D1::ColorF(0x88c8cb),
+                &m_pGraphColor2Brush
                 );
         }
 
@@ -101,6 +102,16 @@ HRESULT IQViewer::CreateDeviceResources()
                 &m_pRedBrush
                 );
         }
+
+        if (SUCCEEDED(hr))
+        {
+            // Create a yellow brush.
+            hr = m_pRenderTarget->CreateSolidColorBrush(
+                D2D1::ColorF(0x00c8c8c8),
+                &m_pGraphBrush
+                );
+        }
+
 
         // Dash array for dashStyle D2D1_DASH_STYLE_CUSTOM
         float dashes[] = {1.0f, 2.0f, 2.0f, 3.0f, 2.0f, 2.0f};
@@ -130,10 +141,11 @@ HRESULT IQViewer::CreateDeviceResources()
 void IQViewer::DiscardDeviceResources()
 {
     SafeRelease(&m_pRenderTarget);
-    SafeRelease(&m_pBlackBrush);
-    SafeRelease(&m_pGrayBrush);
+    SafeRelease(&m_pGraphColor1Brush);
+    SafeRelease(&m_pGraphColor2Brush);
     SafeRelease(&m_pYellowBrush);
     SafeRelease(&m_pRedBrush);
+    SafeRelease(&m_pGraphBrush);
     SafeRelease(&m_pStrokeStyleDotRound);
 }
 
@@ -153,7 +165,7 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType va
 
     m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin, rect.top + top_margin),
                               D2D1::Point2F(rect.left + left_margin, rect.bottom - bottom_margin),
-                              m_pBlackBrush,
+                              m_pGraphBrush,
                               strokeWidth);
 
 
@@ -163,14 +175,14 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType va
         {
             m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin, rect.top + top_margin + cell_height * index),
                                       D2D1::Point2F(rect.right - right_margin, rect.top + top_margin + cell_height * index),
-                                      m_pBlackBrush,
+                                      m_pGraphBrush,
                                       strokeWidth);
         }
         else
         {
             m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin, rect.top + top_margin + cell_height * index),
                                       D2D1::Point2F(rect.right - right_margin, rect.top + top_margin + cell_height * index),
-                                      m_pGrayBrush,
+                                      m_pGraphBrush,
                                       strokeWidth,
                                       m_pStrokeStyleDotRound);
         }
@@ -180,7 +192,7 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType va
     {
         m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin + index * cell_width, rect.top + top_margin),
                                   D2D1::Point2F(rect.left + left_margin + index * cell_width, rect.bottom - bottom_margin),
-                                  m_pGrayBrush,
+                                  m_pGraphBrush,
                                   strokeWidth,
                                   m_pStrokeStyleDotRound);
     }
@@ -236,7 +248,7 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType va
                 {
                     m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin + (float)index * scale_x, middle_y - (float)(i_prev * scale_y)),
                                               D2D1::Point2F(rect.left + left_margin + (float)(index + 1) * scale_x, middle_y - (float)(i * scale_y)),
-                                              m_pYellowBrush,
+                                              m_pGraphColor1Brush,
                                               strokeWidth);
                 }
 
@@ -249,7 +261,7 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType va
                 {
                     m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin + (float)index * scale_x, middle_y - (float)(q_prev * scale_y)),
                                               D2D1::Point2F(rect.left + left_margin + (float)(index + 1) * scale_x, middle_y - (float)(q * scale_y)),
-                                              m_pRedBrush,
+                                              m_pGraphColor2Brush,
                                               strokeWidth);
                 }
                 q_prev = q;
@@ -261,7 +273,7 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType va
                 {
                     m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin + (float)index * scale_x, middle_y - (float)(power_prev * scale_y)),
                                               D2D1::Point2F(rect.left + left_margin + (float)(index + 1) * scale_x, middle_y - (float)(power * scale_y)),
-                                              m_pRedBrush,
+                                              m_pGraphColor1Brush,
                                               strokeWidth);
                 }
                 power_prev = power;
@@ -380,6 +392,7 @@ void IQViewer::OnAccelerator(IQViewerCommand command)
                                     delete m_IQData;
                                 }
                                 m_IQData = iqData;
+                                InvalidateRect(m_hwnd, NULL, false);
                             }
                             else
                             {
@@ -416,7 +429,7 @@ HRESULT IQViewer::OnRender()
 
         m_pRenderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
 
-        m_pRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::White));
+        m_pRenderTarget->Clear(D2D1::ColorF(0x3f3f3f));
 
         if (size.height / 2 > 60)
         {
@@ -627,6 +640,7 @@ LRESULT IQViewer::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             case WM_DESTROY:
                 {
+                    LOGV("MSG: WM_DESTROY");
                     PostQuitMessage(0);
                 }
                 result = 1;
@@ -634,6 +648,7 @@ LRESULT IQViewer::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 break;
             case WM_COMMAND:
             {
+                LOGV("MSG: WM_COMMAND");
                 if (HIWORD(wParam) == 1)
                 {
                     pIQViewer->OnAccelerator((IQViewerCommand)LOWORD(wParam));
@@ -661,6 +676,8 @@ int WINAPI WinMain(HINSTANCE hInstance ,
     WSADATA wsaData;
     WSAStartup(MAKEWORD(2, 2), &wsaData);
 
+    IQDebugInit("iq_viewer.log", true, false);
+
     HeapSetInformation(NULL, HeapEnableTerminationOnCorruption, NULL, 0);
 
     if (SUCCEEDED(CoInitialize(NULL)))
@@ -668,9 +685,15 @@ int WINAPI WinMain(HINSTANCE hInstance ,
         {
             IQViewer iqViewer;
 
+            LOGV("Initialize application");
+
             if (SUCCEEDED(iqViewer.Initialize()))
             {
+                LOGV("Running message loop");
+
                 iqViewer.RunMessageLoop();
+
+                LOGV("All done");
             }
         }
         CoUninitialize();

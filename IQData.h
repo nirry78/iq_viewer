@@ -34,6 +34,7 @@ class IQData
         size_t GetCount() { return m_DataCount; };
         bool GetValue(size_t index, ValueType type, double *value);
         bool ReadFile(FILE *file);
+        bool ProcessData(char *data, size_t dataLength);
 
 };
 

@@ -87,6 +87,22 @@ bool IQData::GetValue(size_t index, ValueType type, double *value)
     return result;
 }
 
+bool IQData::ProcessData(char *data, size_t dataLength)
+{
+    FILE *f = fopen("iq_data.csv", "wt");
+
+    if (f)
+    {
+        for (size_t index = 0; index < dataLength; index++)
+        {
+
+        }
+        fclose(f);
+    }
+
+    return false;
+}
+
 bool IQData::ReadFile(FILE *file)
 {
 /*    char buffer[1024];

@@ -366,13 +366,27 @@ void IQViewer::OnAccelerator(IQViewerCommand command)
                 HGLOBAL hglb = GetClipboardData(CF_TEXT);
                 if (hglb)
                 {
-                    LPTSTR lptstr = (LPTSTR)GlobalLock(hglb);
-                    if (lptstr)
+                    char* lpstr = (char*)GlobalLock(hglb);
+                    if (lpstr)
                     {
-                        size_t size = wcslen(lptstr);
-                        wchar_t buffer[100];
-                        swprintf(buffer, L"Paste (len: %zu)\n", size);
-                        OutputDebugString(buffer);
+                        IQData *iqData = new IQData(512);
+
+                        if (iqData)
+                        {
+                            if (iqData->ProcessData(lpstr, strlen(lpstr)))
+                            {
+                                if (m_IQData)
+                                {
+                                    delete m_IQData;
+                                }
+                                m_IQData = iqData;
+                            }
+                            else
+                            {
+                                delete iqData;
+                            }
+                        }
+
                         GlobalUnlock(hglb);
                     }
                 }
@@ -498,6 +512,10 @@ void IQViewer::RunMessageLoop()
             {
                 break;
             }
+        }
+        else
+        {
+            break;
         }
     }
     OutputDebugString(TEXT("RunMessageLoop - Exit\n"));

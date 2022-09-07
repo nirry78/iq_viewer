@@ -197,13 +197,14 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType va
                                   m_pStrokeStyleDotRound);
     }
 
-    double i, i_prev, q, q_prev, power, power_prev;
-    float scale_x, scale_y;
+    double i, i_prev, q, q_prev, power, power_prev, phase, phase_prev;
+    float scale_x, scale_y, scale_y_phase;
 
     if (iqData)
     {
-        bool valueTypeI = false, valueTypeQ = false, valueTypePower = false;
-        scale_y = view_height / 500;
+        bool valueTypeI = false, valueTypeQ = false, valueTypePower = false, valueTypePhase = false;
+        scale_y = view_height / 130;
+        scale_y_phase = view_height / 380;
         scale_x = view_width / iqData->GetCount();
 
         for (size_t index = 0; valueTypes[index] != ValueTypeNone ; index++)
@@ -231,6 +232,7 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType va
                 }
                 case ValueTypePhase:
                 {
+                    valueTypePhase = true;
                     break;
                 }
                 case ValueTypeUnwrappedPhase:
@@ -278,6 +280,18 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType va
                 }
                 power_prev = power;
             }
+
+            if (valueTypePhase && iqData->GetValue(index, ValueTypePhase, &phase))
+            {
+                if (index > 0)
+                {
+                    m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin + (float)index * scale_x, middle_y - (float)(phase_prev * scale_y_phase)),
+                                              D2D1::Point2F(rect.left + left_margin + (float)(index + 1) * scale_x, middle_y - (float)(phase * scale_y_phase)),
+                                              m_pGraphColor2Brush,
+                                              strokeWidth);
+                }
+                phase_prev = phase;
+            }
         }
     }
     return hr;
@@ -292,8 +306,8 @@ HRESULT IQViewer::Initialize()
     {
         for (size_t index = 0; index < 512; index++)
         {
-            double i = 240.0 * sin((double)index / 90.0 * M_PI);
-            double q = 240.0 * cos((double)index / 90.0 * M_PI);
+            double i = 64.0 * sin((double)index / 90.0 * M_PI);
+            double q = 64.0 * cos((double)index / 90.0 * M_PI);
             m_IQData->AddValue(i, q);
         }
     }
@@ -392,6 +406,12 @@ void IQViewer::OnAccelerator(IQViewerCommand command)
                                     delete m_IQData;
                                 }
                                 m_IQData = iqData;
+                                FILE *f = _fsopen("iq.csv", "wt", _SH_DENYWR);
+                                if (f)
+                                {
+                                    m_IQData->Dump(f);
+                                    fclose(f);
+                                }
                                 InvalidateRect(m_hwnd, NULL, false);
                             }
                             else
@@ -434,7 +454,7 @@ HRESULT IQViewer::OnRender()
         if (size.height / 2 > 60)
         {
             const ValueType valueTypesIQ[3] = {ValueTypeI, ValueTypeQ, ValueTypeNone};
-            const ValueType valueTypesPower[2] = {ValueTypePower, ValueTypeNone};
+            const ValueType valueTypesPower[3] = {ValueTypePower, ValueTypePhase, ValueTypeNone};
             DrawGraph(D2D1::RectF(0.0f, 0.0f, size.width, size.height / 2.0f), m_IQData, valueTypesIQ);
             DrawGraph(D2D1::RectF(0.0f, size.height / 2.0f, size.width, size.height), m_IQData, valueTypesPower);
         }
@@ -503,7 +523,7 @@ void IQViewer::RunMessageLoop()
 
     for (;;)
     {
-        result = MsgWaitForMultipleObjects(1, handleList, false, INFINITE, QS_ALLEVENTS);
+        result = MsgWaitForMultipleObjects(1, handleList, false, INFINITE, QS_ALLINPUT);
         if (result == WAIT_OBJECT_0)
         {
             if (!OnServerEvent())
@@ -523,15 +543,16 @@ void IQViewer::RunMessageLoop()
             }
             else
             {
+                LOGV("GetMessage failed");
                 break;
             }
         }
         else
         {
+            LOGV("MsgWaitForMultipleObjects error");
             break;
         }
     }
-    OutputDebugString(TEXT("RunMessageLoop - Exit\n"));
 }
 
 HRESULT IQViewer::StartServer()

@@ -12,7 +12,7 @@ void IQDebugInit(const char *filename, bool verbose, bool detailed)
     buffer = (char*)malloc(BUFFER_SIZE);
     if (buffer)
     {
-        (void)fopen_s(&debugFile, filename, "wt");
+        debugFile = _fsopen(filename, "wt", _SH_DENYWR);
         ::verbose = verbose;
         ::detailed = detailed;
     }
@@ -29,6 +29,7 @@ static void IQDebugGeneric(const char *function, size_t line, const char *format
     if (debugFile)
     {
         fwrite(buffer, offset, 1, debugFile);
+        fflush(debugFile);
     }
 }
 

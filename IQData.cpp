@@ -7,6 +7,7 @@ typedef enum
     TOKEN_COMMA,
     TOKEN_DOT,
     TOKEN_WHITESPACE,
+    TOKEN_DASH,
     TOKEN_OTHER,
 } Token;
 
@@ -120,6 +121,12 @@ bool IQData::GetValue(size_t index, ValueType type, double *value)
                 *value = sqrt((m_Data[index].i * m_Data[index].i) + (m_Data[index].q * m_Data[index].q));
                 break;
             }
+            case ValueTypePhase:
+            {
+                *value = atan2(m_Data[index].q, m_Data[index].i) * 360.0 / M_PI;
+                LOGV("ValueTypePhase: %g", *value);
+                break;
+            }
             default:
             {
                 *value = 0.0;
@@ -134,7 +141,8 @@ bool IQData::GetValue(size_t index, ValueType type, double *value)
 bool IQData::ProcessData(char *data, size_t dataLength)
 {
     DecodeState state = DECODE_STATE_IDLE;
-    uint64_t value_u64 = 0, value_i = 0, value_q = 0;
+    int64_t value_i64 = 0, value_i = 0, value_q = 0;
+    bool negative = false;
     double value_double = 0.0;
 
     for (size_t index = 0; index < dataLength && state != DECODE_STATE_ERROR; index++)
@@ -204,6 +212,11 @@ bool IQData::ProcessData(char *data, size_t dataLength)
                 token = TOKEN_WHITESPACE;
                 break;
             }
+            case '-':
+            {
+                token = TOKEN_DASH;
+                break;
+            }
             default:
             {
                 token = TOKEN_OTHER;
@@ -219,7 +232,14 @@ bool IQData::ProcessData(char *data, size_t dataLength)
             {
                 if (token == TOKEN_VALUE)
                 {
-                    value_u64 = value;
+                    value_i64 = value;
+                    negative = false;
+                    state = DECODE_STATE_I;
+                }
+                else if (token == TOKEN_DASH)
+                {
+                    value_i64 = 0;
+                    negative = true;
                     state = DECODE_STATE_I;
                 }
                 break;
@@ -228,12 +248,14 @@ bool IQData::ProcessData(char *data, size_t dataLength)
             {
                 if (token == TOKEN_VALUE)
                 {
-                    value_u64 = value + (value_u64 * 10);
+                    value_i64 = value + (value_i64 * 10);
                 }
                 else
                 {
-                    value_i = value_u64;
-                    value_u64 = 0;
+                    value_i = negative ? -value_i64 : value_i64;
+                    negative = false;
+                    value_i64 = 0;
+                    negative = false;
 
                     if (token == TOKEN_WHITESPACE)
                     {
@@ -278,7 +300,13 @@ bool IQData::ProcessData(char *data, size_t dataLength)
             {
                 if (token == TOKEN_VALUE)
                 {
-                    value_u64 = value;
+                    value_i64 = value;
+                    state = DECODE_STATE_Q;
+                }
+                else if (token == TOKEN_DASH)
+                {
+                    value_i64 = 0;
+                    negative = true;
                     state = DECODE_STATE_Q;
                 }
                 else if (token == TOKEN_WHITESPACE)
@@ -299,12 +327,14 @@ bool IQData::ProcessData(char *data, size_t dataLength)
             {
                  if (token == TOKEN_VALUE)
                 {
-                    value_u64 = value + (value_u64 * 10);
+                    value_i64 = value + (value_i64 * 10);
                 }
                 else
                 {
-                    value_q = value_u64;
-                    value_u64 = 0;
+                    value_q = negative ? -value_i64 : value_i64;
+                    negative = false;
+                    value_i64 = 0;
+                    negative = false;
 
                     if (!AddValue((double)value_i, (double)value_q))
                     {

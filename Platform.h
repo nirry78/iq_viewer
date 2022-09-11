@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <float.h>
 
 template<class Interface>
 inline void SafeRelease(

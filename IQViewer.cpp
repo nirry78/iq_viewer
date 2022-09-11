@@ -203,22 +203,43 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType va
     if (iqData)
     {
         bool valueTypeI = false, valueTypeQ = false, valueTypePower = false, valueTypePhase = false;
-        scale_y = view_height / 130;
-        scale_y_phase = view_height / 380;
+        float valueScaleI = 0.0, valueScaleQ = 0.0;
+        scale_y = FLT_MAX;
+        scale_y_phase = view_height / 720;
         scale_x = view_width / iqData->GetCount();
 
         for (size_t index = 0; valueTypes[index] != ValueTypeNone ; index++)
         {
+            double min, max;
+
             switch (valueTypes[index])
             {
                 case ValueTypeI:
                 {
                     valueTypeI = true;
+                    if (iqData->GetMinValue(ValueTypeI, &min) && iqData->GetMaxValue(ValueTypeI, &max))
+                    {
+                        valueScaleI = view_height / (float)(fabs(min) + fabs(max));
+                        LOGV("I (min: %g, max: %g, scale: %g)", min, max, valueScaleI);
+                        if (valueScaleI < scale_y)
+                        {
+                            scale_y = valueScaleI;
+                        }
+                    }
                     break;
                 }
                 case ValueTypeQ:
                 {
                     valueTypeQ = true;
+                    if (iqData->GetMinValue(ValueTypeQ, &min) && iqData->GetMaxValue(ValueTypeQ, &max))
+                    {
+                        valueScaleQ = view_height / (float)(fabs(min) + fabs(max));
+                        LOGV("Q (min: %g, max: %g, scale: %g)", min, max, valueScaleQ);
+                        if (valueScaleQ < scale_y)
+                        {
+                            scale_y = valueScaleQ;
+                        }
+                    }
                     break;
                 }
                 case ValueTypePower:
@@ -241,6 +262,13 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType va
                 }
             }
         }
+
+        if (scale_y == FLT_MAX)
+        {
+            scale_y = 100.0f / view_height;
+        }
+
+        LOGV("Scale (selected: %g)", scale_y);
 
         for (size_t index = 0; index < iqData->GetCount(); index++)
         {
@@ -304,10 +332,11 @@ HRESULT IQViewer::Initialize()
     m_IQData = new IQData(512);
     if (m_IQData)
     {
+        double scale = 256.0;
         for (size_t index = 0; index < 512; index++)
         {
-            double i = 64.0 * sin((double)index / 90.0 * M_PI);
-            double q = 64.0 * cos((double)index / 90.0 * M_PI);
+            double i = scale * sin((double)index / 90.0 * M_PI);
+            double q = scale * 1.2 * cos((double)index / 90.0 * M_PI);
             m_IQData->AddValue(i, q);
         }
     }

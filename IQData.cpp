@@ -45,6 +45,8 @@ const char *stateToText[] =
 
 IQData::IQData(size_t expectedCount):
     m_DataSize(expectedCount),
+    m_DataMin({ 0.0,  0.0 }),
+    m_DataMax({ 0.0,  0.0 }),
     m_DataCount(0),
     m_Data(NULL),
     m_DataIncrease(128)
@@ -80,6 +82,11 @@ bool IQData::AddValue(double i, double q)
 
     if (m_DataCount < m_DataSize)
     {
+        m_DataMin.i = i < m_DataMin.i ? i : m_DataMin.i;
+        m_DataMax.i = i > m_DataMax.i ? i : m_DataMax.i;
+        m_DataMin.q = q < m_DataMin.q ? q : m_DataMin.q;
+        m_DataMax.q = q > m_DataMax.q ? q : m_DataMax.q;
+
         m_Data[m_DataCount].i = i;
         m_Data[m_DataCount].q = q;
         m_DataCount++;
@@ -96,6 +103,59 @@ void IQData::Dump(FILE *dst)
         double angle = atan2(m_Data[index].q, m_Data[index].i) * 360.0 / M_PI;
         fprintf(dst, "%d; %d; %.05g\n", (int32_t)m_Data[index].i, (int32_t)m_Data[index].q, angle);
     }
+}
+
+bool IQData::GetMinValue(ValueType type, double *value)
+{
+    bool result = true;
+
+    switch (type)
+    {
+        case ValueTypeI:
+        {
+            *value = m_DataMin.i;
+            break;
+        }
+        case ValueTypeQ:
+        {
+            *value = m_DataMin.q;
+            break;
+        }
+        default:
+        {
+            *value = 0.0;
+            result = false;
+            break;
+        }
+    }
+
+    return result;
+}
+bool IQData::GetMaxValue(ValueType type, double *value)
+{
+    bool result = true;
+
+    switch (type)
+    {
+        case ValueTypeI:
+        {
+            *value = m_DataMax.i;
+            break;
+        }
+        case ValueTypeQ:
+        {
+            *value = m_DataMax.q;
+            break;
+        }
+        default:
+        {
+            *value = 0.0;
+            result = false;
+            break;
+        }
+    }
+
+    return result;
 }
 
 bool IQData::GetValue(size_t index, ValueType type, double *value)

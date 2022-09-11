@@ -23,6 +23,8 @@ class IQData
 {
     private:
         ComplexNumber *m_Data;
+        ComplexNumber m_DataMin;
+        ComplexNumber m_DataMax;
         size_t m_DataCount;
         size_t m_DataSize;
         size_t m_DataIncrease;
@@ -33,6 +35,8 @@ class IQData
         bool AddValue(double i, double q);
         void Dump(FILE *dst);
         size_t GetCount() { return m_DataCount; };
+        bool GetMinValue(ValueType type, double *value);
+        bool GetMaxValue(ValueType type, double *value);
         bool GetValue(size_t index, ValueType type, double *value);
         bool ReadFile(FILE *file);
         bool ProcessData(char *data, size_t dataLength);

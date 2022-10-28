@@ -197,15 +197,23 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType va
                                   m_pStrokeStyleDotRound);
     }
 
-    double i, i_prev, q, q_prev, power, power_prev, phase, phase_prev;
+    double i, i_prev, q, q_prev, power, power_prev, phase, phase_prev,
+           unwrappedPhase, unwrappedPhase_prev, demod_prev, demod;
     float scale_x, scale_y, scale_y_phase;
 
     if (iqData)
     {
-        bool valueTypeI = false, valueTypeQ = false, valueTypePower = false, valueTypePhase = false;
+        bool valueTypeI = false,
+             valueTypeQ = false,
+             valueTypePower = false,
+             valueTypePhase = false,
+             valueTypeUnwrappedPhase = false,
+             valueTypeDemod = false;
+
         float valueScaleI = 0.0, valueScaleQ = 0.0;
         scale_y = FLT_MAX;
-        scale_y_phase = view_height / 720;
+        scale_y_phase = view_height / 360;
+        //scale_y_phase = view_height / 180;
         scale_x = view_width / iqData->GetCount();
 
         for (size_t index = 0; valueTypes[index] != ValueTypeNone ; index++)
@@ -249,15 +257,25 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType va
                 }
                 case ValueTypeDemod:
                 {
+                    if (iqData->GetMinValue(ValueTypeDemod, &min) && iqData->GetMaxValue(ValueTypeDemod, &max))
+                    {
+                        //scale_y_phase = view_height / (float)(fabs(min) + fabs(max));
+                    }
+                    valueTypeDemod = true;
                     break;
                 }
                 case ValueTypePhase:
                 {
+                    if (iqData->GetMinValue(ValueTypeQ, &min) && iqData->GetMaxValue(ValueTypeQ, &max))
+                    {
+                        //scale_y_phase = view_height / (float)(fabs(min) + fabs(max));
+                    }
                     valueTypePhase = true;
                     break;
                 }
                 case ValueTypeUnwrappedPhase:
                 {
+                    valueTypeUnwrappedPhase = true;
                     break;
                 }
             }
@@ -319,6 +337,30 @@ HRESULT IQViewer::DrawGraph(D2D1_RECT_F rect, IQData *iqData, const ValueType va
                                               strokeWidth);
                 }
                 phase_prev = phase;
+            }
+
+            if (valueTypeUnwrappedPhase && iqData->GetValue(index, ValueTypeUnwrappedPhase, &unwrappedPhase))
+            {
+                if (index > 0)
+                {
+                    m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin + (float)index * scale_x, middle_y - (float)(unwrappedPhase_prev * scale_y_phase)),
+                                              D2D1::Point2F(rect.left + left_margin + (float)(index + 1) * scale_x, middle_y - (float)(unwrappedPhase * scale_y_phase)),
+                                              m_pGraphColor2Brush,
+                                              strokeWidth);
+                }
+                unwrappedPhase_prev = unwrappedPhase;
+            }
+
+            if (ValueTypeDemod && iqData->GetValue(index, ValueTypeDemod, &demod))
+            {
+                if (index > 0)
+                {
+                    m_pRenderTarget->DrawLine(D2D1::Point2F(rect.left + left_margin + (float)index * scale_x, middle_y - (float)(demod_prev * scale_y_phase)),
+                                              D2D1::Point2F(rect.left + left_margin + (float)(index + 1) * scale_x, middle_y - (float)(demod * scale_y_phase)),
+                                              m_pGraphColor2Brush,
+                                              strokeWidth);
+                }
+                demod_prev = demod;
             }
         }
     }

@@ -7,6 +7,9 @@
 typedef struct
 {
     double i, q;
+    double angle;
+    double unwrapped_angle;
+    double demod;
 } ComplexNumber;
 
 typedef enum {
@@ -25,6 +28,12 @@ class IQData
         ComplexNumber *m_Data;
         ComplexNumber m_DataMin;
         ComplexNumber m_DataMax;
+        double m_AngleMin;
+        double m_AngleMax;
+        double m_UnwrappedAngleMin;
+        double m_UnwrappedAngleMax;
+        double m_DemodMin;
+        double m_DemodMax;
         size_t m_DataCount;
         size_t m_DataSize;
         size_t m_DataIncrease;

@@ -43,10 +43,26 @@ const char *stateToText[] =
     "ERROR"
 };
 
+static double angle_norm(double angle) {
+    double angle_norm = remainder(angle + M_PI, M_PI*2);
+    if (angle_norm < 0) angle_norm += 2*M_PI;
+    return angle_norm - M_PI;
+}
+
+static double unwrap(double previous_angle, double new_angle) {
+    return previous_angle + angle_norm(new_angle - previous_angle);
+}
+
 IQData::IQData(size_t expectedCount):
     m_DataSize(expectedCount),
     m_DataMin({ 0.0,  0.0 }),
     m_DataMax({ 0.0,  0.0 }),
+    m_AngleMin(0.0),
+    m_AngleMax(0.0),
+    m_UnwrappedAngleMin(0.0),
+    m_UnwrappedAngleMax(0.0),
+    m_DemodMin(0.0),
+    m_DemodMax(0.0),
     m_DataCount(0),
     m_Data(NULL),
     m_DataIncrease(128)
@@ -82,13 +98,33 @@ bool IQData::AddValue(double i, double q)
 
     if (m_DataCount < m_DataSize)
     {
+        double angle = atan2(q, i) * 180 / M_PI;
+
+        m_Data[m_DataCount].i = i;
+        m_Data[m_DataCount].q = q;
+        m_Data[m_DataCount].angle = angle;
+        m_Data[m_DataCount].unwrapped_angle = m_DataCount > 0 ?
+                                              unwrap(m_Data[m_DataCount - 1].angle, angle) :
+                                              angle;
+        m_Data[m_DataCount].demod = m_DataCount > 0 ?
+                                              unwrap(m_Data[m_DataCount - 1].angle, angle) :
+                                              angle;
+
         m_DataMin.i = i < m_DataMin.i ? i : m_DataMin.i;
         m_DataMax.i = i > m_DataMax.i ? i : m_DataMax.i;
         m_DataMin.q = q < m_DataMin.q ? q : m_DataMin.q;
         m_DataMax.q = q > m_DataMax.q ? q : m_DataMax.q;
+        m_AngleMin = angle < m_AngleMin ? angle : m_AngleMin;
+        m_AngleMax = angle < m_AngleMax ? angle : m_AngleMax;
+        m_UnwrappedAngleMin = m_Data[m_DataCount].unwrapped_angle < m_UnwrappedAngleMin ?
+                              m_Data[m_DataCount].unwrapped_angle : m_UnwrappedAngleMin;
+        m_UnwrappedAngleMax = m_Data[m_DataCount].unwrapped_angle < m_UnwrappedAngleMax ?
+                              m_Data[m_DataCount].unwrapped_angle : m_UnwrappedAngleMax;
+        m_DemodMin = m_Data[m_DataCount].demod < m_DemodMin ?
+                     m_Data[m_DataCount].demod : m_DemodMin;
+        m_DemodMax = m_Data[m_DataCount].demod < m_DemodMax ?
+                     m_Data[m_DataCount].demod : m_DemodMax;
 
-        m_Data[m_DataCount].i = i;
-        m_Data[m_DataCount].q = q;
         m_DataCount++;
         result = true;
     }
@@ -121,6 +157,21 @@ bool IQData::GetMinValue(ValueType type, double *value)
             *value = m_DataMin.q;
             break;
         }
+        case ValueTypePhase:
+        {
+            *value = m_AngleMin;
+            break;
+        }
+        case ValueTypeUnwrappedPhase:
+        {
+            *value = m_UnwrappedAngleMin;
+            break;
+        }
+        case ValueTypeDemod:
+        {
+            *value = m_DemodMin;
+            break;
+        }
         default:
         {
             *value = 0.0;
@@ -145,6 +196,21 @@ bool IQData::GetMaxValue(ValueType type, double *value)
         case ValueTypeQ:
         {
             *value = m_DataMax.q;
+            break;
+        }
+        case ValueTypePhase:
+        {
+            *value = m_AngleMax;
+            break;
+        }
+        case ValueTypeUnwrappedPhase:
+        {
+            *value = m_UnwrappedAngleMax;
+            break;
+        }
+        case ValueTypeDemod:
+        {
+            *value = m_DemodMax;
             break;
         }
         default:
@@ -183,8 +249,17 @@ bool IQData::GetValue(size_t index, ValueType type, double *value)
             }
             case ValueTypePhase:
             {
-                *value = atan2(m_Data[index].q, m_Data[index].i) * 360.0 / M_PI;
-                LOGV("ValueTypePhase: %g", *value);
+                *value = m_Data[index].angle;
+                break;
+            }
+            case ValueTypeUnwrappedPhase:
+            {
+                *value = m_Data[index].unwrapped_angle;
+                break;
+            }
+            case ValueTypeDemod:
+            {
+                *value = m_Data[index].demod;
                 break;
             }
             default:
